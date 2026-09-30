@@ -239,6 +239,13 @@ const CONTROL_PANEL_HTML = String.raw`<!doctype html>
               '<div class="find-meta">' + esc(date) + '</div>' +
             '</div>' +
             '<div class="items">' + list + '</div>' +
+            '<div class="find-meta" style="margin-top:10px">' +
+              'User ID: ' + esc(entry.userId || "Unknown") + '<br>' +
+              'Occupied Slots: ' + esc(entry.occupiedSlots || items.length || 0) + '<br>' +
+              'Job ID: ' + esc(entry.jobId || "Unknown") + '<br>' +
+              'Plot ID: ' + esc(entry.plotId || "Unknown") + '<br>' +
+              'PlaceId: ' + esc(entry.placeId || "Unknown") +
+            '</div>' +
           '</div>';
         }
 
