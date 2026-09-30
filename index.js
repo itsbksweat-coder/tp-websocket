@@ -222,9 +222,9 @@ const CONTROL_PANEL_HTML = String.raw`<!doctype html>
             var name = typeof item === "string" ? item : (item.name || "Unknown");
             var extra = typeof item === "object" && item.extra ? item.extra : "";
 
-            list += '<li><strong>' + esc(name) + '</strong>' +
+            list += '<div class="item"><strong>' + esc(name) + '</strong>' +
               (extra ? '<span class="extra">' + esc(extra) + '</span>' : '') +
-              '</li>';
+              '</div>';
           }
 
           html += '<div class="find">' +
@@ -234,7 +234,7 @@ const CONTROL_PANEL_HTML = String.raw`<!doctype html>
                 ' @' + esc(entry.username || "Unknown") + '</div>' +
               '<div class="find-meta">' + esc(date) + '</div>' +
             '</div>' +
-            '<ol class="numbered">' + list + '</ol>' +
+            '<div class="items">' + list + '</div>' +
           '</div>';
         }
 
@@ -771,7 +771,7 @@ export class TriggerRoom extends DurableObject {
           ? " — " + item.extra
           : "";
 
-      lines.push((i + 1) + ". " + name + extra);
+      lines.push(name + extra);
     }
 
     const description = lines.join("\n").slice(0, 3900);
