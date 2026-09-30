@@ -4,6 +4,7 @@ const RECEIVER_PATH = "/ws1";
 const SENDER_PATH = "/ws2";
 const ROOM_NAME = "global";
 const HISTORY_LIMIT = 200;
+const WEBHOOK_FORMAT_VERSION = "v3";
 
 const CONTROL_PANEL_HTML = String.raw`<!doctype html>
 <html lang="en">
@@ -85,6 +86,8 @@ const CONTROL_PANEL_HTML = String.raw`<!doctype html>
 
         <div class="actions">
           <button id="teleport" class="primary" type="button">Teleport Selected</button>
+          <button id="testWebhook" class="dark" type="button">Test Webhook</button>
+          <button id="resendWebhook" class="dark" type="button">Resend Latest</button>
         </div>
 
         <div class="note">Receiver list, base contents, and stored finds update automatically.</div>
@@ -115,6 +118,8 @@ const CONTROL_PANEL_HTML = String.raw`<!doctype html>
       var placeInput = document.getElementById("placeId");
       var jobInput = document.getElementById("jobId");
       var teleportButton = document.getElementById("teleport");
+      var testWebhookButton = document.getElementById("testWebhook");
+      var resendWebhookButton = document.getElementById("resendWebhook");
 
       var socket = null;
       var players = [];
@@ -334,6 +339,15 @@ const CONTROL_PANEL_HTML = String.raw`<!doctype html>
             return;
           }
 
+          if (data.type === "webhook_result") {
+            if (data.ok) {
+              webhookStatusEl.textContent = "Webhook: SENT · HTTP " + (data.status || "OK");
+            } else {
+              webhookStatusEl.textContent = "Webhook: FAILED · " + (data.error || ("HTTP " + (data.status || "?")));
+            }
+            return;
+          }
+
           if (data.type === "webhook_status") {
             if (!data.configured) {
               webhookStatusEl.textContent = "Webhook: NOT CONFIGURED";
@@ -391,6 +405,20 @@ const CONTROL_PANEL_HTML = String.raw`<!doctype html>
           target: info.username,
           placeId: placeId,
           jobId: jobId
+        });
+      });
+
+      testWebhookButton.addEventListener("click", function(){
+        webhookStatusEl.textContent = "Webhook: testing...";
+        send({ type: "webhook_test" });
+      });
+
+      resendWebhookButton.addEventListener("click", function(){
+        var info = currentSelected();
+        webhookStatusEl.textContent = "Webhook: resending latest...";
+        send({
+          type: "webhook_resend_latest",
+          username: info ? info.username : ""
         });
       });
 
@@ -595,10 +623,23 @@ export class TriggerRoom extends DurableObject {
       return;
     }
 
+    if (data?.type === "webhook_test") {
+      const result = await this.sendDiscordTest();
+      this.safeSend(ws, { type: "webhook_result", ...result });
+      return;
+    }
+
+    if (data?.type === "webhook_resend_latest") {
+      const username = this.cleanText(data.username, 40).toLowerCase();
+      const result = await this.resendLatestWebhook(username);
+      this.safeSend(ws, { type: "webhook_result", ...result });
+      return;
+    }
+
     if (data?.type !== "join") {
       this.safeSend(ws, {
         type: "error",
-        error: "Expected type=list, type=history, type=webhook_status, or type=join",
+        error: "Expected type=list, type=history, type=webhook_status, type=webhook_test, type=webhook_resend_latest, or type=join",
       });
       return;
     }
@@ -852,9 +893,10 @@ export class TriggerRoom extends DurableObject {
       return;
     }
 
+    const deliverySignature = WEBHOOK_FORMAT_VERSION + "|" + String(meta.jobId || "") + "|" + snapshot;
     const deliveredSnapshot = await this.ctx.storage.get(deliveredKey);
 
-    if (deliveredSnapshot === snapshot) {
+    if (deliveredSnapshot === deliverySignature) {
       return;
     }
 
@@ -879,7 +921,7 @@ export class TriggerRoom extends DurableObject {
     });
 
     if (result.ok) {
-      await this.ctx.storage.put(deliveredKey, snapshot);
+      await this.ctx.storage.put(deliveredKey, deliverySignature);
     }
 
     this.broadcastWebhookStatus();
@@ -978,6 +1020,77 @@ export class TriggerRoom extends DurableObject {
     }
   }
 
+  async sendDiscordTest() {
+    if (!this.env.DISCORD_WEBHOOK_URL) {
+      return {
+        ok: false,
+        status: 0,
+        error: "DISCORD_WEBHOOK_URL secret is missing",
+      };
+    }
+
+    try {
+      const response = await fetch(this.env.DISCORD_WEBHOOK_URL, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          username: "Base Logger",
+          embeds: [{
+            title: "Webhook Test",
+            description: "The tp-websocket Worker can send to this webhook.",
+            timestamp: new Date().toISOString(),
+          }],
+        }),
+      });
+
+      let body = "";
+      if (!response.ok) {
+        try { body = (await response.text()).slice(0, 300); } catch {}
+      }
+
+      return {
+        ok: response.ok,
+        status: response.status,
+        error: response.ok ? "" : ("Discord HTTP " + response.status + (body ? ": " + body : "")),
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        status: 0,
+        error: String(error && error.message ? error.message : error),
+      };
+    }
+  }
+
+  async resendLatestWebhook(usernameLower = "") {
+    if (!this.env.DISCORD_WEBHOOK_URL) {
+      return { ok: false, status: 0, error: "DISCORD_WEBHOOK_URL secret is missing" };
+    }
+
+    const history = await this.getHistory();
+    const entry = history.find((item) => {
+      if (!item) return false;
+      if (!usernameLower) return true;
+      return String(item.username || "").toLowerCase() === usernameLower;
+    });
+
+    if (!entry) {
+      return { ok: false, status: 0, error: "No stored snapshot found to resend" };
+    }
+
+    const result = await this.sendDiscordWebhook(entry);
+
+    await this.ctx.storage.put("webhookStatus", {
+      configured: true,
+      lastOk: result.ok,
+      lastStatus: result.status || null,
+      lastError: result.error || "",
+      updatedAt: new Date().toISOString(),
+    });
+
+    this.broadcastWebhookStatus();
+    return result;
+  }
   async getWebhookStatus() {
     const saved = await this.ctx.storage.get("webhookStatus");
 
