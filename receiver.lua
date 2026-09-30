@@ -443,7 +443,7 @@ end
 
 task.spawn(function()
     while true do
-        task.wait(15)
+        task.wait(5)
         register("update")
     end
 end)
