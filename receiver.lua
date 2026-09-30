@@ -170,9 +170,7 @@ local function collectOwnBaseItems()
 
                 if objectText ~= "" then
                     items[#items + 1] = {
-                        slot = slotNumber,
-                        objectText = objectText,
-                        name = objectText
+                        name = "Slot " .. tostring(slotNumber) .. " -> " .. objectText
                     }
                 end
             end
