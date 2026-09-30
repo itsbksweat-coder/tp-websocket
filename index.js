@@ -881,20 +881,46 @@ export class TriggerRoom extends DurableObject {
   async sendDiscordWebhook(entry) {
     const lines = [];
 
-    for (let i = 0; i < entry.items.length; i++) {
-      const item = entry.items[i] || {};
-      const name = typeof item === "string" ? item : item.name;
-      const extra =
-        typeof item === "object" && item.extra
-          ? " — " + item.extra
-          : "";
-
-      if (name) {
-        lines.push(name + extra);
-      }
+    for (const raw of entry.items || []) {
+      const name = typeof raw === "string" ? raw : String(raw?.name || "");
+      if (name) lines.push(name);
     }
 
-    const description = lines.join("\n").slice(0, 3900) || "No items.";
+    const animals = lines.join("\n").slice(0, 3800) || "No occupied slots found.";
+    const fields = [
+      {
+        name: "Animals",
+        value: "```\n" + animals + "\n```",
+      },
+      {
+        name: "Username",
+        value: entry.username || "Unknown",
+        inline: true,
+      },
+      {
+        name: "User ID",
+        value: entry.userId ? String(entry.userId) : "Unknown",
+        inline: true,
+      },
+      {
+        name: "Occupied Slots",
+        value: String(entry.occupiedSlots || (entry.items || []).length || 0),
+        inline: true,
+      },
+      {
+        name: "Job ID",
+        value: entry.jobId ? "```" + entry.jobId + "```" : "Unknown",
+      },
+      {
+        name: "Plot ID",
+        value: entry.plotId ? "```" + entry.plotId + "```" : "Unknown",
+      },
+      {
+        name: "PlaceId",
+        value: entry.placeId ? String(entry.placeId) : "Unknown",
+        inline: true,
+      },
+    ];
 
     try {
       const response = await fetch(this.env.DISCORD_WEBHOOK_URL, {
@@ -903,21 +929,15 @@ export class TriggerRoom extends DurableObject {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          username: "TP Base Finds",
+          username: "Base Logger",
           embeds: [
             {
-              title: "Base snapshot #" + entry.id,
-              description,
-              fields: [
-                {
-                  name: "Player",
-                  value:
-                    (entry.displayName || entry.username) +
-                    " (@" +
-                    entry.username +
-                    ")",
-                },
-              ],
+              title: "🎯 Base Logger",
+              description:
+                "Found **" +
+                String(entry.occupiedSlots || (entry.items || []).length || 0) +
+                "** occupied slots.",
+              fields,
               timestamp: entry.timestamp,
             },
           ],
