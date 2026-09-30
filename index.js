@@ -518,6 +518,12 @@ export class TriggerRoom extends DurableObject {
 
       const username = this.cleanText(data.username, 40);
       const displayName = this.cleanText(data.displayName || data.username, 60);
+      const userId = Number(data.userId) || null;
+      const placeId = Number(data.placeId) || null;
+      const jobId = this.cleanText(data.jobId, 200);
+      const plotId = this.cleanText(data.plotId, 120);
+      const highestSlot = Number(data.highestSlot) || 0;
+      const occupiedSlots = Number(data.occupiedSlots) || 0;
       const items = this.cleanItems(data.items);
 
       if (!username) {
@@ -533,6 +539,12 @@ export class TriggerRoom extends DurableObject {
         username,
         usernameLower: username.toLowerCase(),
         displayName,
+        userId,
+        placeId,
+        jobId,
+        plotId,
+        highestSlot,
+        occupiedSlots,
         items,
       });
 
@@ -543,7 +555,14 @@ export class TriggerRoom extends DurableObject {
       });
 
       if (items.length > 0) {
-        await this.storeSnapshotIfChanged(username, displayName, items);
+        await this.storeSnapshotIfChanged(username, displayName, items, {
+          userId,
+          placeId,
+          jobId,
+          plotId,
+          highestSlot,
+          occupiedSlots,
+        });
       }
 
       this.broadcastPlayers();
@@ -708,6 +727,12 @@ export class TriggerRoom extends DurableObject {
       players.push({
         username: info.username,
         displayName: info.displayName || info.username,
+        userId: info.userId || null,
+        placeId: info.placeId || null,
+        jobId: info.jobId || "",
+        plotId: info.plotId || "",
+        highestSlot: info.highestSlot || 0,
+        occupiedSlots: info.occupiedSlots || 0,
         items: Array.isArray(info.items) ? info.items : [],
       });
     }
