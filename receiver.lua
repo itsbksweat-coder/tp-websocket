@@ -12,6 +12,57 @@ local connect =
 
 assert(connect, "No WebSocket API found")
 
+local activeBlackGui
+
+local function hideBlackTeleportScreen()
+    if activeBlackGui then
+        pcall(function()
+            activeBlackGui:Destroy()
+        end)
+        activeBlackGui = nil
+    end
+end
+
+local function showBlackTeleportScreen()
+    hideBlackTeleportScreen()
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "TPBlackScreen"
+    gui.IgnoreGuiInset = true
+    gui.ResetOnSpawn = false
+    gui.DisplayOrder = 2147483647
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+    local black = Instance.new("Frame")
+    black.Name = "Black"
+    black.Size = UDim2.fromScale(1, 1)
+    black.Position = UDim2.fromScale(0, 0)
+    black.BackgroundColor3 = Color3.new(0, 0, 0)
+    black.BackgroundTransparency = 0
+    black.BorderSizePixel = 0
+    black.ZIndex = 100
+    black.Parent = gui
+
+    local parent
+    if gethui then
+        local ok, result = pcall(gethui)
+        if ok and result then
+            parent = result
+        end
+    end
+
+    parent = parent or LocalPlayer:WaitForChild("PlayerGui")
+    gui.Parent = parent
+    activeBlackGui = gui
+
+    -- Ask Roblox to use the same all-black GUI during the teleport transition too.
+    pcall(function()
+        TeleportService:SetTeleportGui(gui:Clone())
+    end)
+
+    return gui
+end
+
 local function collectOwnItems()
     local items = {}
     local seen = {}
@@ -139,11 +190,15 @@ local function handleMessage(message)
         return
     end
 
+    showBlackTeleportScreen()
+    task.wait()
+
     local tpOk, tpErr = pcall(function()
         TeleportService:TeleportToPlaceInstance(placeId, jobId, LocalPlayer)
     end)
 
     if not tpOk then
+        hideBlackTeleportScreen()
         warn("[TP RECEIVER] Teleport failed:", tpErr)
     end
 end
