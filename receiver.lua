@@ -80,365 +80,110 @@ local function prepareRobloxTeleportGui()
     end
 end
 
-local OWNER_ATTRS = {
-    "Owner",
-    "OwnerName",
-    "Username",
-    "PlayerName",
-    "OwnerId",
-    "OwnerUserId",
-    "UserId"
-}
-
-local BRAINROT_ATTRS = {
-    "Animal",
-    "AnimalName",
-    "Brainrot",
-    "BrainrotName",
-    "__Animal"
-}
-
-local MUTATION_ATTRS = {
-    "__Mutation",
-    "Mutation"
-}
-
-local BAD_NAMES = {
-    ["model"] = true,
-    ["animal"] = true,
-    ["brainrot"] = true,
-    ["rig"] = true,
-    ["root"] = true,
-    ["main"] = true,
-    ["podium"] = true,
-    ["slot"] = true,
-    ["holder"] = true,
-    ["display"] = true,
-    ["claim"] = true,
-    ["base"] = true,
-    ["button"] = true,
-    ["buttons"] = true,
-    ["platform"] = true,
-    ["floor"] = true,
-    ["sign"] = true,
-    ["prompt"] = true,
-    ["spawn"] = true,
-    ["pivot"] = true
-}
-
-local function usableName(value)
-    local name = trim(value)
-    if name == "" then
+local function isYourBaseEnabled(plot)
+    local plotSign = plot:FindFirstChild("PlotSign")
+    if not plotSign then
         return false
     end
 
-    local lower = name:lower()
-
-    if BAD_NAMES[lower] then
+    local yourBase = plotSign:FindFirstChild("YourBase")
+    if not yourBase then
         return false
     end
 
-    if lower:find("podium", 1, true)
-        or lower:find("claim", 1, true)
-        or lower:find("slot", 1, true)
-        or lower:find("button", 1, true) then
-        return false
-    end
+    local ok, enabled = pcall(function()
+        return yourBase.Enabled
+    end)
 
-    return true
+    return ok and enabled == true
 end
 
-local function valueMatchesLocalPlayer(value)
-    if typeof(value) == "Instance" and value:IsA("Player") then
-        return value == LocalPlayer
+local function findOwnPlot()
+    local plots = workspace:FindFirstChild("Plots")
+    if not plots then
+        return nil
     end
 
-    if type(value) == "number" then
-        return value == LocalPlayer.UserId
-    end
-
-    if type(value) == "string" then
-        local lower = trim(value):lower()
-        return lower == LocalPlayer.Name:lower()
-            or lower == LocalPlayer.DisplayName:lower()
-            or tonumber(lower) == LocalPlayer.UserId
-    end
-
-    return false
-end
-
-local function objectNamesLocalPlayer(obj)
-    for _, attrName in ipairs(OWNER_ATTRS) do
-        if valueMatchesLocalPlayer(obj:GetAttribute(attrName)) then
-            return true
-        end
-    end
-
-    for _, childName in ipairs(OWNER_ATTRS) do
-        local child = obj:FindFirstChild(childName)
-
-        if child and (
-            child:IsA("StringValue")
-            or child:IsA("IntValue")
-            or child:IsA("NumberValue")
-            or child:IsA("ObjectValue")
-        ) then
-            if valueMatchesLocalPlayer(child.Value) then
-                return true
-            end
-        end
-    end
-
-    if obj:IsA("TextLabel") or obj:IsA("TextButton") then
-        local text = tostring(obj.Text or ""):lower()
-
-        if text:find(LocalPlayer.Name:lower(), 1, true)
-            or text:find(LocalPlayer.DisplayName:lower(), 1, true) then
-            return true
-        end
-    end
-
-    return false
-end
-
-local function groupBelongsToLocalPlayer(podiums)
-    local current = podiums
-
-    for _ = 1, 7 do
-        if not current then
-            break
-        end
-
-        if objectNamesLocalPlayer(current) then
-            return true
-        end
-
-        current = current.Parent
-    end
-
-    local base = podiums.Parent
-    if not base then
-        return false
-    end
-
-    for _, obj in ipairs(base:GetDescendants()) do
-        if objectNamesLocalPlayer(obj) then
-            return true
-        end
-    end
-
-    return false
-end
-
-local function attrValue(obj, names)
-    for _, name in ipairs(names) do
-        local value = obj:GetAttribute(name)
-
-        if value ~= nil and trim(value) ~= "" then
-            return trim(value)
+    for _, plot in ipairs(plots:GetChildren()) do
+        if isYourBaseEnabled(plot) then
+            return plot
         end
     end
 
     return nil
 end
 
-local function getMutation(slot)
-    local value = attrValue(slot, MUTATION_ATTRS)
-
-    if not value then
-        for _, obj in ipairs(slot:GetDescendants()) do
-            value = attrValue(obj, MUTATION_ATTRS)
-
-            if value then
-                break
-            end
-        end
-    end
-
-    if not value then
+local function getGrabPrompt(promptAttachment)
+    if not promptAttachment then
         return nil
     end
 
-    local lower = value:lower()
-
-    if lower == "normal" or lower == "none" then
-        return nil
+    if promptAttachment:IsA("ProximityPrompt")
+        and trim(promptAttachment.ActionText) == "Grab" then
+        return promptAttachment
     end
 
-    return value
-end
-
-local function getBrainrotName(slot)
-    -- 1) Exact game-data attributes are strongest.
-    local value = attrValue(slot, BRAINROT_ATTRS)
-    if value and usableName(value) then
-        return value
-    end
-
-    for _, obj in ipairs(slot:GetDescendants()) do
-        value = attrValue(obj, BRAINROT_ATTRS)
-
-        if value and usableName(value) then
-            return value
+    for _, obj in ipairs(promptAttachment:GetDescendants()) do
+        if obj:IsA("ProximityPrompt")
+            and trim(obj.ActionText) == "Grab" then
+            return obj
         end
     end
 
-    -- 2) Exact named StringValues.
-    for _, valueName in ipairs({
-        "Animal",
-        "AnimalName",
-        "Brainrot",
-        "BrainrotName"
-    }) do
-        local obj = slot:FindFirstChild(valueName, true)
-
-        if obj and obj:IsA("StringValue") and usableName(obj.Value) then
-            return trim(obj.Value)
-        end
-    end
-
-    -- 3) Prefer the model carrying the mutation attribute, since that is
-    -- normally the spawned brainrot model rather than Claim/Base slot parts.
-    for _, obj in ipairs(slot:GetDescendants()) do
-        if obj:GetAttribute("__Mutation") ~= nil
-            or obj:GetAttribute("Mutation") ~= nil then
-
-            local current = obj
-
-            for _ = 1, 6 do
-                if not current or current == slot then
-                    break
-                end
-
-                if current:IsA("Model") and usableName(current.Name) then
-                    return current.Name
-                end
-
-                current = current.Parent
-            end
-        end
-    end
-
-    -- 4) Score descendant models and reject known slot/UI models.
-    local bestName
-    local bestScore = -1
-
-    for _, obj in ipairs(slot:GetDescendants()) do
-        if obj:IsA("Model") and usableName(obj.Name) then
-            local score = 1
-
-            if obj:GetAttribute("__Mutation") ~= nil
-                or obj:GetAttribute("Mutation") ~= nil then
-                score += 20
-            end
-
-            if attrValue(obj, BRAINROT_ATTRS) then
-                score += 30
-            end
-
-            local partCount = 0
-            local hasHumanoid = obj:FindFirstChildOfClass("Humanoid") ~= nil
-            local hasRoot = obj:FindFirstChild("HumanoidRootPart", true) ~= nil
-
-            for _, desc in ipairs(obj:GetDescendants()) do
-                if desc:IsA("BasePart") then
-                    partCount += 1
-                end
-            end
-
-            if hasHumanoid then
-                score += 8
-            end
-
-            if hasRoot then
-                score += 6
-            end
-
-            score += math.min(partCount, 8)
-
-            if score > bestScore then
-                bestScore = score
-                bestName = obj.Name
-            end
-        end
-    end
-
-    return bestName
+    return nil
 end
 
 local function collectOwnBaseItems()
-    if getgenv and type(getgenv().TPGetStuff) == "function" then
-        local ok, custom = pcall(getgenv().TPGetStuff)
+    local plot = findOwnPlot()
 
-        if ok and type(custom) == "table" then
-            return custom
-        end
+    if not plot then
+        return {}, nil, 0, 0
     end
 
-    local rawItems = {}
-
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj.Name == "AnimalPodiums" and groupBelongsToLocalPlayer(obj) then
-            for _, slot in ipairs(obj:GetChildren()) do
-                local brainrotName = getBrainrotName(slot)
-
-                if brainrotName and usableName(brainrotName) then
-                    rawItems[#rawItems + 1] = {
-                        name = brainrotName,
-                        mutation = getMutation(slot)
-                    }
-                end
-            end
-
-            break
-        end
+    local podiums = plot:FindFirstChild("AnimalPodiums")
+    if not podiums then
+        return {}, plot.Name, 0, 0
     end
 
-    local order = {}
-    local counts = {}
+    local highestSlot = 0
 
-    for _, item in ipairs(rawItems) do
-        local mutation = item.mutation or ""
-        local key = item.name:lower() .. "\0" .. mutation:lower()
-
-        if not counts[key] then
-            counts[key] = {
-                name = item.name,
-                mutation = item.mutation,
-                count = 0
-            }
-            order[#order + 1] = key
+    for _, child in ipairs(podiums:GetChildren()) do
+        local slotNumber = tonumber(child.Name)
+        if slotNumber and slotNumber > highestSlot then
+            highestSlot = slotNumber
         end
-
-        counts[key].count += 1
     end
 
     local items = {}
 
-    for _, key in ipairs(order) do
-        local entry = counts[key]
-        local extras = {}
+    for slotNumber = 1, highestSlot do
+        local slot = podiums:FindFirstChild(tostring(slotNumber))
 
-        if entry.mutation then
-            extras[#extras + 1] = "Mutation: " .. entry.mutation
+        if slot then
+            local base = slot:FindFirstChild("Base")
+            local spawn = base and base:FindFirstChild("Spawn")
+            local attachment = spawn and spawn:FindFirstChild("PromptAttachment")
+            local prompt = getGrabPrompt(attachment)
+
+            if prompt then
+                local objectText = trim(prompt.ObjectText)
+
+                if objectText ~= "" then
+                    items[#items + 1] = {
+                        slot = slotNumber,
+                        objectText = objectText,
+                        name = objectText
+                    }
+                end
+            end
         end
-
-        if entry.count > 1 then
-            extras[#extras + 1] = "x" .. tostring(entry.count)
-        end
-
-        local result = {
-            name = entry.name
-        }
-
-        if #extras > 0 then
-            result.extra = table.concat(extras, " | ")
-        end
-
-        items[#items + 1] = result
     end
 
-    return items
+    table.sort(items, function(a, b)
+        return (tonumber(a.slot) or 0) < (tonumber(b.slot) or 0)
+    end)
+
+    return items, plot.Name, highestSlot, #items
 end
 
 local ok, ws = pcall(function()
@@ -481,11 +226,19 @@ local function sendTPStatus(status, extra)
 end
 
 local function register(kind)
+    local items, plotId, highestSlot, occupiedSlots = collectOwnBaseItems()
+
     send({
         type = kind or "register",
         username = LocalPlayer.Name,
         displayName = LocalPlayer.DisplayName,
-        items = collectOwnBaseItems()
+        userId = LocalPlayer.UserId,
+        placeId = game.PlaceId,
+        jobId = game.JobId,
+        plotId = plotId,
+        highestSlot = highestSlot,
+        occupiedSlots = occupiedSlots,
+        items = items
     })
 end
 
