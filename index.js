@@ -768,7 +768,7 @@ export class TriggerRoom extends DurableObject {
     });
   }
 
-  async storeSnapshotIfChanged(username, displayName, items) {
+  async storeSnapshotIfChanged(username, displayName, items, meta = {}) {
     const usernameLower = username.toLowerCase();
     const snapshot = JSON.stringify(items);
     const lastKey = "last:" + usernameLower;
@@ -787,6 +787,12 @@ export class TriggerRoom extends DurableObject {
         id: nextId,
         username,
         displayName,
+        userId: meta.userId || null,
+        placeId: meta.placeId || null,
+        jobId: meta.jobId || "",
+        plotId: meta.plotId || "",
+        highestSlot: meta.highestSlot || 0,
+        occupiedSlots: meta.occupiedSlots || items.length,
         items,
         timestamp: new Date().toISOString(),
       };
@@ -816,6 +822,12 @@ export class TriggerRoom extends DurableObject {
           id: 0,
           username,
           displayName,
+          userId: meta.userId || null,
+          placeId: meta.placeId || null,
+          jobId: meta.jobId || "",
+          plotId: meta.plotId || "",
+          highestSlot: meta.highestSlot || 0,
+          occupiedSlots: meta.occupiedSlots || items.length,
           items,
           timestamp: new Date().toISOString(),
         };
