@@ -58,8 +58,8 @@ end
 
 local Main = Instance.new("Frame")
 Main.Name = "Main"
-Main.Size = UDim2.fromOffset(330, 390)
-Main.Position = UDim2.new(0.5, -165, 0.5, -195)
+Main.Size = UDim2.fromOffset(350, 410)
+Main.Position = UDim2.new(0.5, -175, 0.5, -205)
 Main.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 Main.BorderSizePixel = 0
 Main.Parent = ScreenGui
@@ -80,7 +80,7 @@ Header.BackgroundTransparency = 1
 Header.Parent = Main
 
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -90, 1, 0)
+Title.Size = UDim2.new(1, -130, 1, 0)
 Title.Position = UDim2.fromOffset(14, 0)
 Title.BackgroundTransparency = 1
 Title.Text = "TP Receiver"
@@ -89,6 +89,20 @@ Title.TextSize = 20
 Title.Font = Enum.Font.GothamBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = Header
+
+local SettingsButton = Instance.new("TextButton")
+SettingsButton.Size = UDim2.fromOffset(94, 32)
+SettingsButton.Position = UDim2.new(1, -108, 0, 8)
+SettingsButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+SettingsButton.TextColor3 = Color3.new(1, 1, 1)
+SettingsButton.Text = "Settings"
+SettingsButton.TextSize = 13
+SettingsButton.Font = Enum.Font.GothamBold
+SettingsButton.Parent = Header
+
+local SettingsButtonCorner = Instance.new("UICorner")
+SettingsButtonCorner.CornerRadius = UDim.new(0, 8)
+SettingsButtonCorner.Parent = SettingsButton
 
 local Status = Instance.new("TextLabel")
 Status.Size = UDim2.new(1, -28, 0, 24)
@@ -108,23 +122,8 @@ ListPage.Position = UDim2.fromOffset(14, 78)
 ListPage.BackgroundTransparency = 1
 ListPage.Parent = Main
 
-local Refresh = Instance.new("TextButton")
-Refresh.Size = UDim2.new(1, 0, 0, 38)
-Refresh.BackgroundColor3 = Color3.fromRGB(240, 240, 240)
-Refresh.TextColor3 = Color3.fromRGB(10, 10, 10)
-Refresh.Text = "Refresh"
-Refresh.TextSize = 14
-Refresh.Font = Enum.Font.GothamBold
-Refresh.AutoButtonColor = true
-Refresh.Parent = ListPage
-
-local RefreshCorner = Instance.new("UICorner")
-RefreshCorner.CornerRadius = UDim.new(0, 8)
-RefreshCorner.Parent = Refresh
-
 local PlayerList = Instance.new("ScrollingFrame")
-PlayerList.Size = UDim2.new(1, 0, 1, -48)
-PlayerList.Position = UDim2.fromOffset(0, 48)
+PlayerList.Size = UDim2.fromScale(1, 1)
 PlayerList.BackgroundTransparency = 1
 PlayerList.BorderSizePixel = 0
 PlayerList.ScrollBarThickness = 4
@@ -169,7 +168,7 @@ local StuffTitle = Instance.new("TextLabel")
 StuffTitle.Size = UDim2.new(1, 0, 0, 25)
 StuffTitle.Position = UDim2.fromOffset(0, 48)
 StuffTitle.BackgroundTransparency = 1
-StuffTitle.Text = "Stuff"
+StuffTitle.Text = "Base Stuff"
 StuffTitle.TextColor3 = Color3.fromRGB(185, 185, 185)
 StuffTitle.TextSize = 13
 StuffTitle.Font = Enum.Font.GothamBold
@@ -234,8 +233,133 @@ local TeleportCorner = Instance.new("UICorner")
 TeleportCorner.CornerRadius = UDim.new(0, 8)
 TeleportCorner.Parent = Teleport
 
+local SettingsPage = Instance.new("Frame")
+SettingsPage.Name = "SettingsPage"
+SettingsPage.Size = UDim2.new(1, -28, 1, -92)
+SettingsPage.Position = UDim2.fromOffset(14, 78)
+SettingsPage.BackgroundTransparency = 1
+SettingsPage.Visible = false
+SettingsPage.Parent = Main
+
+local SettingsTitle = Instance.new("TextLabel")
+SettingsTitle.Size = UDim2.new(1, 0, 0, 34)
+SettingsTitle.BackgroundTransparency = 1
+SettingsTitle.Text = "Teleport Settings"
+SettingsTitle.TextColor3 = Color3.new(1, 1, 1)
+SettingsTitle.TextSize = 18
+SettingsTitle.Font = Enum.Font.GothamBold
+SettingsTitle.TextXAlignment = Enum.TextXAlignment.Left
+SettingsTitle.Parent = SettingsPage
+
+local PlaceLabel = Instance.new("TextLabel")
+PlaceLabel.Size = UDim2.new(1, 0, 0, 24)
+PlaceLabel.Position = UDim2.fromOffset(0, 42)
+PlaceLabel.BackgroundTransparency = 1
+PlaceLabel.Text = "PlaceId"
+PlaceLabel.TextColor3 = Color3.fromRGB(185, 185, 185)
+PlaceLabel.TextSize = 13
+PlaceLabel.Font = Enum.Font.GothamBold
+PlaceLabel.TextXAlignment = Enum.TextXAlignment.Left
+PlaceLabel.Parent = SettingsPage
+
+local PlaceBox = Instance.new("TextBox")
+PlaceBox.Size = UDim2.new(1, 0, 0, 42)
+PlaceBox.Position = UDim2.fromOffset(0, 68)
+PlaceBox.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+PlaceBox.BorderSizePixel = 0
+PlaceBox.TextColor3 = Color3.new(1, 1, 1)
+PlaceBox.PlaceholderColor3 = Color3.fromRGB(125, 125, 125)
+PlaceBox.PlaceholderText = "Enter PlaceId"
+PlaceBox.Text = tostring(game.PlaceId)
+PlaceBox.TextSize = 14
+PlaceBox.Font = Enum.Font.Gotham
+PlaceBox.ClearTextOnFocus = false
+PlaceBox.TextXAlignment = Enum.TextXAlignment.Left
+PlaceBox.Parent = SettingsPage
+
+local PlaceBoxCorner = Instance.new("UICorner")
+PlaceBoxCorner.CornerRadius = UDim.new(0, 8)
+PlaceBoxCorner.Parent = PlaceBox
+
+local PlacePadding = Instance.new("UIPadding")
+PlacePadding.PaddingLeft = UDim.new(0, 10)
+PlacePadding.PaddingRight = UDim.new(0, 10)
+PlacePadding.Parent = PlaceBox
+
+local JobLabel = Instance.new("TextLabel")
+JobLabel.Size = UDim2.new(1, 0, 0, 24)
+JobLabel.Position = UDim2.fromOffset(0, 122)
+JobLabel.BackgroundTransparency = 1
+JobLabel.Text = "JobId"
+JobLabel.TextColor3 = Color3.fromRGB(185, 185, 185)
+JobLabel.TextSize = 13
+JobLabel.Font = Enum.Font.GothamBold
+JobLabel.TextXAlignment = Enum.TextXAlignment.Left
+JobLabel.Parent = SettingsPage
+
+local JobBox = Instance.new("TextBox")
+JobBox.Size = UDim2.new(1, 0, 0, 42)
+JobBox.Position = UDim2.fromOffset(0, 148)
+JobBox.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+JobBox.BorderSizePixel = 0
+JobBox.TextColor3 = Color3.new(1, 1, 1)
+JobBox.PlaceholderColor3 = Color3.fromRGB(125, 125, 125)
+JobBox.PlaceholderText = "Enter JobId"
+JobBox.Text = tostring(game.JobId)
+JobBox.TextSize = 14
+JobBox.Font = Enum.Font.Gotham
+JobBox.ClearTextOnFocus = false
+JobBox.TextXAlignment = Enum.TextXAlignment.Left
+JobBox.Parent = SettingsPage
+
+local JobBoxCorner = Instance.new("UICorner")
+JobBoxCorner.CornerRadius = UDim.new(0, 8)
+JobBoxCorner.Parent = JobBox
+
+local JobPadding = Instance.new("UIPadding")
+JobPadding.PaddingLeft = UDim.new(0, 10)
+JobPadding.PaddingRight = UDim.new(0, 10)
+JobPadding.Parent = JobBox
+
+local UseCurrent = Instance.new("TextButton")
+UseCurrent.Size = UDim2.new(1, 0, 0, 42)
+UseCurrent.Position = UDim2.fromOffset(0, 206)
+UseCurrent.BackgroundColor3 = Color3.fromRGB(240, 240, 240)
+UseCurrent.TextColor3 = Color3.fromRGB(10, 10, 10)
+UseCurrent.Text = "Use Current Server"
+UseCurrent.TextSize = 14
+UseCurrent.Font = Enum.Font.GothamBold
+UseCurrent.Parent = SettingsPage
+
+local UseCurrentCorner = Instance.new("UICorner")
+UseCurrentCorner.CornerRadius = UDim.new(0, 8)
+UseCurrentCorner.Parent = UseCurrent
+
+local SettingsBack = Instance.new("TextButton")
+SettingsBack.Size = UDim2.new(1, 0, 0, 42)
+SettingsBack.Position = UDim2.new(0, 0, 1, -42)
+SettingsBack.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+SettingsBack.TextColor3 = Color3.new(1, 1, 1)
+SettingsBack.Text = "Back"
+SettingsBack.TextSize = 14
+SettingsBack.Font = Enum.Font.GothamBold
+SettingsBack.Parent = SettingsPage
+
+local SettingsBackCorner = Instance.new("UICorner")
+SettingsBackCorner.CornerRadius = UDim.new(0, 8)
+SettingsBackCorner.Parent = SettingsBack
+
 local players = {}
 local selected = nil
+local currentPage = "list"
+local connected = true
+
+local function showPage(name)
+    currentPage = name
+    ListPage.Visible = name == "list"
+    DetailPage.Visible = name == "detail"
+    SettingsPage.Visible = name == "settings"
+end
 
 local function send(data)
     local encoded = HttpService:JSONEncode(data)
@@ -272,7 +396,7 @@ local function renderStuff(info)
         local label = Instance.new("TextLabel")
         label.Size = UDim2.new(1, -4, 0, 30)
         label.BackgroundTransparency = 1
-        label.Text = "Nothing detected"
+        label.Text = "No base brainrots detected"
         label.TextColor3 = Color3.fromRGB(145, 145, 145)
         label.TextSize = 13
         label.Font = Enum.Font.Gotham
@@ -322,14 +446,11 @@ local function openPlayer(info)
     selected = info
     SelectedName.Text = (info.displayName or info.username) .. "  @" .. info.username
     renderStuff(info)
-
-    ListPage.Visible = false
-    DetailPage.Visible = true
+    showPage("detail")
 end
 
 local function renderPlayers()
     clearChildrenExceptLayout(PlayerList)
-
     Empty.Visible = #players == 0
 
     for index, info in ipairs(players) do
@@ -354,19 +475,32 @@ local function renderPlayers()
         end)
     end
 
-    Status.Text = tostring(#players) .. " receiver(s) online"
+    Status.Text = tostring(#players) .. " receiver(s) online - auto updating"
 end
 
 local function requestPlayers()
-    send({ type = "list" })
+    if connected then
+        send({ type = "list" })
+    end
 end
-
-Refresh.MouseButton1Click:Connect(requestPlayers)
 
 Back.MouseButton1Click:Connect(function()
     selected = nil
-    DetailPage.Visible = false
-    ListPage.Visible = true
+    showPage("list")
+end)
+
+SettingsButton.MouseButton1Click:Connect(function()
+    showPage("settings")
+end)
+
+SettingsBack.MouseButton1Click:Connect(function()
+    showPage("list")
+end)
+
+UseCurrent.MouseButton1Click:Connect(function()
+    PlaceBox.Text = tostring(game.PlaceId)
+    JobBox.Text = tostring(game.JobId)
+    Status.Text = "Settings set to current server"
 end)
 
 Teleport.MouseButton1Click:Connect(function()
@@ -375,8 +509,16 @@ Teleport.MouseButton1Click:Connect(function()
         return
     end
 
-    if game.JobId == "" then
-        Status.Text = "Current JobId is empty"
+    local placeId = tonumber(PlaceBox.Text)
+    local jobId = tostring(JobBox.Text or ""):match("^%s*(.-)%s*$")
+
+    if not placeId or placeId <= 0 then
+        Status.Text = "Invalid PlaceId in Settings"
+        return
+    end
+
+    if jobId == "" then
+        Status.Text = "Invalid JobId in Settings"
         return
     end
 
@@ -385,8 +527,8 @@ Teleport.MouseButton1Click:Connect(function()
     send({
         type = "join",
         target = selected.username,
-        placeId = game.PlaceId,
-        jobId = game.JobId
+        placeId = placeId,
+        jobId = jobId
     })
 end)
 
@@ -439,6 +581,7 @@ local function onMessage(message)
     end
 
     if data.type == "connected" then
+        connected = true
         Status.Text = "Connected - loading receivers..."
         requestPlayers()
         return
@@ -449,15 +592,23 @@ local function onMessage(message)
         renderPlayers()
 
         if selected and selected.username then
+            local found
             for _, info in ipairs(players) do
                 if tostring(info.username):lower() == tostring(selected.username):lower() then
                     selected = info
-                    if DetailPage.Visible then
+                    found = true
+                    if currentPage == "detail" then
                         SelectedName.Text = (info.displayName or info.username) .. "  @" .. info.username
                         renderStuff(info)
                     end
                     break
                 end
+            end
+
+            if not found and currentPage == "detail" then
+                selected = nil
+                Status.Text = "Receiver went offline"
+                showPage("list")
             end
         end
         return
@@ -489,8 +640,16 @@ end
 
 if ws.OnClose then
     ws.OnClose:Connect(function()
+        connected = false
         Status.Text = "Disconnected"
     end)
 end
+
+task.spawn(function()
+    while ScreenGui.Parent do
+        task.wait(3)
+        requestPlayers()
+    end
+end)
 
 requestPlayers()
