@@ -1,0 +1,25 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "tp-websocket",
+  "main": "index.js",
+  "compatibility_date": "2026-09-29",
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "TP_RELAY",
+        "class_name": "TriggerRoom"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "TriggerRoom"
+      ]
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}
