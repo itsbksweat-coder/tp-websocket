@@ -223,11 +223,54 @@ local function sendTPStatus(status, extra)
     send(payload)
 end
 
-local function register(kind)
+local lastBaseSignature
+local refreshQueued = false
+local watchedPlot
+local watchConnections = {}
+
+local function disconnectBaseWatch()
+    for _, connection in ipairs(watchConnections) do
+        pcall(function()
+            connection:Disconnect()
+        end)
+    end
+
+    table.clear(watchConnections)
+    watchedPlot = nil
+end
+
+local function addWatch(connection)
+    if connection then
+        watchConnections[#watchConnections + 1] = connection
+    end
+end
+
+local function makeBaseSignature(items, plotId, highestSlot, occupiedSlots)
+    local parts = {
+        tostring(plotId or ""),
+        tostring(highestSlot or 0),
+        tostring(occupiedSlots or 0)
+    }
+
+    for _, item in ipairs(items) do
+        parts[#parts + 1] = tostring(item.name or "")
+    end
+
+    return table.concat(parts, "\31")
+end
+
+local function register(kind, force)
     local items, plotId, highestSlot, occupiedSlots = collectOwnBaseItems()
+    local signature = makeBaseSignature(items, plotId, highestSlot, occupiedSlots)
+
+    if not force and signature == lastBaseSignature then
+        return false
+    end
+
+    lastBaseSignature = signature
 
     send({
-        type = kind or "register",
+        type = kind or "update",
         username = LocalPlayer.Name,
         displayName = LocalPlayer.DisplayName,
         userId = LocalPlayer.UserId,
@@ -238,6 +281,120 @@ local function register(kind)
         occupiedSlots = occupiedSlots,
         items = items
     })
+
+    print(
+        "[TP RECEIVER] Base updated:",
+        tostring(plotId or "NO PLOT"),
+        "| occupied:",
+        occupiedSlots
+    )
+
+    for _, item in ipairs(items) do
+        print("[TP RECEIVER]", item.name)
+    end
+
+    return true
+end
+
+local function queueBaseRefresh()
+    if refreshQueued then
+        return
+    end
+
+    refreshQueued = true
+
+    task.delay(0.15, function()
+        refreshQueued = false
+        register("update", false)
+    end)
+end
+
+local function watchPrompt(prompt)
+    if not prompt or not prompt:IsA("ProximityPrompt") then
+        return
+    end
+
+    addWatch(prompt:GetPropertyChangedSignal("ActionText"):Connect(queueBaseRefresh))
+    addWatch(prompt:GetPropertyChangedSignal("ObjectText"):Connect(queueBaseRefresh))
+    addWatch(prompt:GetPropertyChangedSignal("Enabled"):Connect(queueBaseRefresh))
+end
+
+local function rebuildBaseWatch()
+    local plot = findOwnPlot()
+
+    if plot == watchedPlot then
+        return
+    end
+
+    disconnectBaseWatch()
+    watchedPlot = plot
+
+    if not plot then
+        queueBaseRefresh()
+        return
+    end
+
+    local plotSign = plot:FindFirstChild("PlotSign")
+    local yourBase = plotSign and plotSign:FindFirstChild("YourBase")
+
+    if yourBase then
+        addWatch(yourBase:GetPropertyChangedSignal("Enabled"):Connect(function()
+            task.defer(function()
+                rebuildBaseWatch()
+                queueBaseRefresh()
+            end)
+        end))
+    end
+
+    local podiums = plot:FindFirstChild("AnimalPodiums")
+
+    if not podiums then
+        queueBaseRefresh()
+        return
+    end
+
+    for _, obj in ipairs(podiums:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") then
+            watchPrompt(obj)
+        end
+    end
+
+    addWatch(podiums.DescendantAdded:Connect(function(obj)
+        if obj:IsA("ProximityPrompt") then
+            watchPrompt(obj)
+        end
+
+        queueBaseRefresh()
+    end))
+
+    addWatch(podiums.DescendantRemoving:Connect(function()
+        queueBaseRefresh()
+    end))
+
+    addWatch(podiums.ChildAdded:Connect(function()
+        queueBaseRefresh()
+    end))
+
+    addWatch(podiums.ChildRemoved:Connect(function()
+        queueBaseRefresh()
+    end))
+end
+
+local plotsFolder = workspace:FindFirstChild("Plots")
+if plotsFolder then
+    addWatch(plotsFolder.ChildAdded:Connect(function()
+        task.defer(function()
+            rebuildBaseWatch()
+            queueBaseRefresh()
+        end)
+    end))
+
+    addWatch(plotsFolder.ChildRemoved:Connect(function()
+        task.defer(function()
+            rebuildBaseWatch()
+            queueBaseRefresh()
+        end)
+    end))
 end
 
 pcall(function()
@@ -289,7 +446,8 @@ local function handleMessage(message)
     end
 
     if data.type == "connected" then
-        register("register")
+        rebuildBaseWatch()
+        register("register", true)
         print("[TP RECEIVER] Ready/registering as", LocalPlayer.Name)
         return
     end
@@ -387,7 +545,8 @@ end
 
 task.spawn(function()
     while true do
-        task.wait(5)
-        register("update")
+        task.wait(2)
+        rebuildBaseWatch()
+        register("update", false)
     end
 end)
