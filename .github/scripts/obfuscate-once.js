@@ -1,7 +1,7 @@
-const fs = require("fs");
-const path = require("path");
-const crypto = require("crypto");
-const { TextEncoder } = require("util");
+import fs from "fs";
+import path from "path";
+import crypto from "crypto";
+import { TextEncoder } from "util";
 
 const U32 = 0x100000000;
 function ri(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
