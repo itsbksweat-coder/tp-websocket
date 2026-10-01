@@ -1,0 +1,36 @@
+name: One-time Lua obfuscation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/obfuscate-once.yml"
+      - ".github/scripts/obfuscate-once.js"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  obfuscate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Obfuscate Lua files
+        run: node .github/scripts/obfuscate-once.js
+
+      - name: Commit obfuscated Lua
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Obfuscate Lua scripts with Volta VM" || exit 0
+          git push
