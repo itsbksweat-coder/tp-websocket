@@ -522,3 +522,4 @@ for(const file of files){
 // One-time build: remove the temporary builder and workflow before commit.
 try{ fs.unlinkSync(path.join(process.cwd(),".github","scripts","obfuscate-once.js")); }catch{}
 try{ fs.unlinkSync(path.join(process.cwd(),".github","workflows","obfuscate-once.yml")); }catch{}
+
